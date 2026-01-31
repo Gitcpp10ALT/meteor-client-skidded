@@ -404,11 +404,13 @@ public class KillAura extends Module {
     }
 
     private void handleStrafe(Entity target) {
-        Vec3d playerPos = mc.player.getPos();
-        Vec3d targetPos = target.getPos();
+        double playerX = mc.player.getX();
+        double playerZ = mc.player.getZ();
+        double targetX = target.getX();
+        double targetZ = target.getZ();
         
-        double deltaX = targetPos.x - playerPos.x;
-        double deltaZ = targetPos.z - playerPos.z;
+        double deltaX = targetX - playerX;
+        double deltaZ = targetZ - playerZ;
         double distance = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
         
         if (distance == 0) return;
@@ -449,7 +451,8 @@ public class KillAura extends Module {
         }
         
         // Apply movement
-        mc.player.setVelocity(moveDirection.x, mc.player.getVelocity().y, moveDirection.z);
+        Vec3d currentVelocity = mc.player.getVelocity();
+        mc.player.setVelocity(moveDirection.x, currentVelocity.y, moveDirection.z);
     }
 
     private void stopAttacking() {
