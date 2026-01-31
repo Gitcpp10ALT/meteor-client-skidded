@@ -264,6 +264,14 @@ public class KillAura extends Module {
         .build()
     );
 
+    private final Setting<StrafeMode> strafeMode = sgStrafe.add(new EnumSetting.Builder<StrafeMode>()
+        .name("strafe-mode")
+        .description("How to control strafing direction.")
+        .defaultValue(StrafeMode.Auto)
+        .visible(strafe::get)
+        .build()
+    );
+
     private final Setting<Double> strafeDistance = sgStrafe.add(new DoubleSetting.Builder()
         .name("strafe-distance")
         .description("The distance to maintain from the target while strafing.")
@@ -288,7 +296,7 @@ public class KillAura extends Module {
         .name("strafe-direction")
         .description("The direction to strafe around the target.")
         .defaultValue(StrafeDirection.Left)
-        .visible(strafe::get)
+        .visible(() -> strafe.get() && strafeMode.get() == StrafeMode.Auto)
         .build()
     );
 
@@ -418,8 +426,26 @@ public class KillAura extends Module {
         // Calculate angle to target
         double angleToTarget = Math.atan2(deltaZ, deltaX);
         
+        // Determine strafe direction based on mode
+        StrafeDirection currentDirection = strafeDirection.get();
+        if (strafeMode.get() == StrafeMode.Control) {
+            // D key strafes left, A key strafes right
+            boolean pressingD = mc.options.rightKey.isPressed();
+            boolean pressingA = mc.options.leftKey.isPressed();
+            
+            if (pressingD && !pressingA) {
+                currentDirection = StrafeDirection.Left;
+            } else if (pressingA && !pressingD) {
+                currentDirection = StrafeDirection.Right;
+            } else {
+                // If both or neither are pressed, don't strafe (just maintain distance)
+                maintainDistance(target, deltaX, deltaZ, distance);
+                return;
+            }
+        }
+        
         // Calculate strafe angle (perpendicular to target direction)
-        double strafeAngle = angleToTarget + (strafeDirection.get() == StrafeDirection.Left ? Math.PI / 2 : -Math.PI / 2);
+        double strafeAngle = angleToTarget + (currentDirection == StrafeDirection.Left ? Math.PI / 2 : -Math.PI / 2);
         
         // Calculate desired position based on strafe distance
         double desiredDistance = strafeDistance.get();
@@ -448,6 +474,35 @@ public class KillAura extends Module {
                 0,
                 Math.sin(strafeAngle) * currentSpeed
             );
+        }
+        
+        // Apply movement
+        Vec3d currentVelocity = mc.player.getVelocity();
+        mc.player.setVelocity(moveDirection.x, currentVelocity.y, moveDirection.z);
+    }
+
+    private void maintainDistance(Entity target, double deltaX, double deltaZ, double distance) {
+        double desiredDistance = strafeDistance.get();
+        double currentSpeed = strafeSpeed.get();
+        
+        Vec3d moveDirection;
+        if (distance > desiredDistance) {
+            // Move towards target
+            moveDirection = new Vec3d(
+                (deltaX / distance) * currentSpeed,
+                0,
+                (deltaZ / distance) * currentSpeed
+            );
+        } else if (distance < desiredDistance - 0.5) {
+            // Move away from target
+            moveDirection = new Vec3d(
+                -(deltaX / distance) * currentSpeed,
+                0,
+                -(deltaZ / distance) * currentSpeed
+            );
+        } else {
+            // Already at desired distance, don't move
+            return;
         }
         
         // Apply movement
@@ -601,5 +656,10 @@ public class KillAura extends Module {
     public enum StrafeDirection {
         Left,
         Right
+    }
+
+    public enum StrafeMode {
+        Auto,
+        Control
     }
 }
